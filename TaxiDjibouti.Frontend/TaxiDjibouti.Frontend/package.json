@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "taxi-djibouti-frontend": "file:.."
+  }
+}
