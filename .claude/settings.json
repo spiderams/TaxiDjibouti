@@ -1,0 +1,64 @@
+{
+  "language": "csharp",
+  "project": {
+    "name": "TaxiDjibouti",
+    "type": "dotnet-aspire-webapi",
+    "framework": "net10.0",
+    "architecture": "clean-architecture-modular-monolith",
+    "csharp_version": "latest"
+  },
+  "style": {
+    "use_var": "when_obvious",
+    "use_records": true,
+    "use_file_scoped_namespaces": true,
+    "use_primary_constructors": true,
+    "async_suffix": true,
+    "xml_documentation": "public_members_multiline_fr"
+  },
+  "patterns": {
+    "cqrs": {
+      "library": "custom-no-mediatr",
+      "command_suffix": "Command",
+      "query_suffix": "Query",
+      "handler_suffix": "Handler",
+      "dispatch": "direct-handler-injection-in-endpoint"
+    },
+    "result": { "type": "Result/Result<T>", "http_mapping": "ToHttpResult" },
+    "validation": { "library": "FluentValidation", "error_language": "fr-FR", "via": "decorator" },
+    "orm": {
+      "library": "EntityFrameworkCore",
+      "provider": "Npgsql + PostGIS + NetTopologySuite",
+      "configuration": "fluent_api",
+      "naming": "snake_case",
+      "soft_delete": false
+    },
+    "specification": "Ardalis.Specification",
+    "endpoints": "IEndpoint auto-discovery (Minimal API) + ToHttpResult",
+    "realtime": "SignalR (in-process)"
+  },
+  "testing": {
+    "framework": "xunit",
+    "mocking": "moq",
+    "assertions": "fluentassertions",
+    "architecture": "NetArchTest",
+    "require_for_new_features": true
+  },
+  "logging": {
+    "library": "Microsoft.Extensions.Logging source-generated [LoggerMessage]",
+    "sink": "OpenTelemetry (Aspire dashboard)",
+    "structured": true
+  },
+  "infrastructure": {
+    "database": "postgresql + postgis",
+    "orchestration": "dotnet-aspire",
+    "file_storage": "azure-blob (planned)",
+    "cloud": "azure (planned)"
+  },
+  "identity": {
+    "library": "ASP.NET Core Identity",
+    "auth": "custom JWT + refresh tokens",
+    "login": "phone-number",
+    "roles": ["Client", "Driver", "Admin"]
+  },
+  "documentation": { "language": "french", "api_comments": "xml-multiline", "readme": true }
+}

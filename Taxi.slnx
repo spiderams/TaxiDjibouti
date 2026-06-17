@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/Solutions Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Taxi.Application/Taxi.Application.csproj" />
+    <Project Path="src/Taxi.Domain/Taxi.Domain.csproj" />
+    <Project Path="src/Taxi.Infrastructure/Taxi.Infrastructure.csproj" />
+    <Project Path="src/Taxi.SharedKernel/Taxi.SharedKernel.csproj" />
+    <Project Path="src/Taxi.Web.Api/Taxi.Web.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Taxi.Application.Tests/Taxi.Application.Tests.csproj" />
+    <Project Path="tests/Taxi.Architecture.Tests/Taxi.Architecture.Tests.csproj" />
+  </Folder>
+  <Project Path="Taxi.AppHost/Taxi.AppHost.csproj" />
+  <Project Path="Taxi.ServiceDefaults/Taxi.ServiceDefaults.csproj" />
+</Solution>
