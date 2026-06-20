@@ -708,8 +708,7 @@ function AdminSpace({ session }: { session: AuthResponse }) {
       setMessage,
       async () => {
         await api.createDriver(
-          {
-            userId: Number(driverUserId),
+          {           
             licenseNumber,
             vehiclePlate,
             vehicleType,
