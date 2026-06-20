@@ -3,39 +3,75 @@ import axios from "axios";
 export type UserRole = "Client" | "Driver" | "Admin";
 export type RideAction = "arrived" | "start" | "complete" | "cancel";
 
-export interface AuthResponse {
-  token: string;
-  userId: number;
-  fullName: string;
-  role: UserRole;
-}
-
-export interface UserSummary {
-  id: number;
+/**
+ * Informations sur l'utilisateur authentifié, telles que renvoyées par le backend
+ * dans l'objet imbriqué `user` de la réponse d'authentification.
+ */
+export interface AuthUser {
+  id: string;
   fullName: string;
   phoneNumber: string;
-  role: UserRole;
-  createdAt?: string;
+  roles: UserRole[];
 }
 
+/**
+ * Réponse d'authentification renvoyée par /api/Auth/login et /api/Auth/register.
+ * La forme reflète exactement le DTO backend (AuthResponse) : jeton d'accès,
+ * jeton de rafraîchissement, et objet `user` imbriqué contenant les rôles.
+ */
+export interface AuthResponse {
+  accessToken: string;
+  expiresAt: string;
+  tokenType: string;
+  refreshToken: string;
+  refreshTokenExpiresAt: string;
+  user: AuthUser;
+}
+
+/**
+ * Détermine le rôle le plus privilégié d'un utilisateur authentifié,
+ * utilisé pour décider de l'espace vers lequel rediriger (Admin > Driver > Client).
+ */
+export function primaryRole(user: AuthUser): UserRole {
+  if (user.roles.includes("Admin")) return "Admin";
+  if (user.roles.includes("Driver")) return "Driver";
+  return "Client";
+}
+
+/**
+ * Résumé d'utilisateur renvoyé par /api/admin/users.
+ * Reflète le DTO backend UserSummary : id Identity (string GUID) et liste de rôles.
+ */
+export interface UserSummary {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  roles: UserRole[];
+}
+
+/**
+ * Profil chauffeur renvoyé par le backend (DriverDto).
+ * `id` est l'identifiant métier (int), `userId` l'identifiant Identity (string GUID).
+ */
 export interface DriverProfile {
   id: number;
-  userId: number;
-  user?: UserSummary | null;
+  userId: string;
   licenseNumber: string;
   vehiclePlate: string;
   vehicleType: string;
   isAvailable: boolean;
   averageRating: number;
-  createdAt: string;
 }
 
+/**
+ * Course renvoyée par le backend (RideDto).
+ * `id`/`driverId` sont des identifiants métier (int), `clientId` est un id Identity (string GUID).
+ * `status` est l'enum RideStatus sérialisé en string ("Pending", "Accepted", ...).
+ */
 export interface Ride {
   id: number;
-  clientId: number;
-  client?: UserSummary | null;
+  clientId: string;
   driverId?: number | null;
-  driver?: DriverProfile | null;
   pickupAddress: string;
   destinationAddress: string;
   pickupZone: string;
@@ -98,7 +134,6 @@ export const api = {
   }) => (await http.post<AuthResponse>("/api/Auth/register", payload)).data,
   createDriver: async (
     payload: {
-      userId: number;
       licenseNumber: string;
       vehiclePlate: string;
       vehicleType: string;
@@ -110,7 +145,7 @@ export const api = {
   setAvailability: async (isAvailable: boolean, token: string) =>
     (
       await http.post<DriverProfile>(
-        "/api/Drivers/set-available",
+        "/api/Drivers/set-availability",
         { isAvailable },
         authHeader(token),
       )

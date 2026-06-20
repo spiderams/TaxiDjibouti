@@ -17,6 +17,7 @@ import {
   UserRole,
   UserSummary,
   api,
+  primaryRole,
 } from "./api";
 import { MapPicker, type MapPoint } from "./components/MapPicker";
 import {
@@ -125,10 +126,11 @@ function App() {
 }
 
 function Home({ session }: { session: AuthResponse | null }) {
+  const role = session ? primaryRole(session.user) : null;
   const dashboardLink =
-    session?.role === "Admin"
+    role === "Admin"
       ? "/admin"
-      : session?.role === "Driver"
+      : role === "Driver"
         ? "/chauffeur"
         : "/client";
 
@@ -217,10 +219,11 @@ function AuthPage({
           ? await api.login(phoneNumber, password)
           : await api.register({ fullName, phoneNumber, password, role });
       onAuthenticated(auth);
+      const userRole = primaryRole(auth.user);
       navigate(
-        auth.role === "Admin"
+        userRole === "Admin"
           ? "/admin"
-          : auth.role === "Driver"
+          : userRole === "Driver"
             ? "/chauffeur"
             : "/client",
       );
@@ -301,7 +304,7 @@ function ClientSpace({ session }: { session: AuthResponse }) {
   const [driverLocation, setDriverLocation] = useState<MapPoint | null>(null);
   const [rides, setRides] = useState<Ride[]>([]);
   const [message, setMessage] = useState("");
-  const token = session.token;
+  const token = session.accessToken;
 
   const refresh = async () => setRides(await api.myRides(token));
 
@@ -321,13 +324,13 @@ function ClientSpace({ session }: { session: AuthResponse }) {
 
     connection
       .start()
-      .then(() => joinClientLocationGroup(connection, session.userId))
+      .then(() => joinClientLocationGroup(connection, session.user.id))
       .catch(showError(setMessage));
 
     return () => {
       connection.stop().catch(() => undefined);
     };
-  }, [session.userId, token]);
+  }, [session.user.id, token]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -439,7 +442,7 @@ function DriverSpace({ session }: { session: AuthResponse }) {
   const [licenseNumber, setLicenseNumber] = useState("LIC-001");
   const [vehiclePlate, setVehiclePlate] = useState("DJ-1234");
   const [vehicleType, setVehicleType] = useState("Taxi");
-  const token = session.token;
+  const token = session.accessToken;
   const locationConnectionRef = useRef<ReturnType<
     typeof createRideHubConnection
   > | null>(null);
@@ -578,7 +581,6 @@ function DriverSpace({ session }: { session: AuthResponse }) {
                 () =>
                   api.createDriver(
                     {
-                      userId: session.userId,
                       licenseNumber,
                       vehiclePlate,
                       vehicleType,
@@ -663,7 +665,7 @@ function AdminSpace({ session }: { session: AuthResponse }) {
   const [adminDriverLocations, setAdminDriverLocations] = useState<
     Record<number, DriverLocationPayload>
   >({});
-  const token = session.token;
+  const token = session.accessToken;
 
   const refresh = async () => {
     const [nextStats, nextUsers, nextDrivers, nextRides] = await Promise.all([
@@ -764,16 +766,16 @@ function AdminSpace({ session }: { session: AuthResponse }) {
         <SimpleTable
           title="Utilisateurs"
           rows={users.map((u) => [
-            String(u.id),
+            u.id,
             u.fullName,
-            `${u.phoneNumber} · ${u.role}`,
+            `${u.phoneNumber} · ${u.roles.join(", ")}`,
           ])}
         />
       </div>
       <SimpleTable
         title="Chauffeurs"
         rows={drivers.map((d) => [
-          d.user?.fullName ?? `#${d.userId}`,
+          `#${d.userId}`,
           d.vehiclePlate,
           d.isAvailable ? "Disponible" : "Indisponible",
         ])}
@@ -891,13 +893,14 @@ function Protected({
   children: React.ReactNode;
 }) {
   if (!session) return <Navigate to="/login" replace />;
-  if (session.role !== role)
+  const userRole = primaryRole(session.user);
+  if (userRole !== role)
     return (
       <Navigate
         to={
-          session.role === "Admin"
+          userRole === "Admin"
             ? "/admin"
-            : session.role === "Driver"
+            : userRole === "Driver"
               ? "/chauffeur"
               : "/client"
         }
@@ -964,8 +967,8 @@ function RideList({
                 {ride.estimatedPrice} FDJ
               </p>
               <p className="text-xs text-slate-500">
-                Client : {ride.client?.fullName ?? ride.clientId} · Chauffeur :{" "}
-                {ride.driver?.user?.fullName ?? ride.driverId ?? "non assigné"}
+                Client : {ride.clientId} · Chauffeur :{" "}
+                {ride.driverId ?? "non assigné"}
               </p>
               <RideTimeline ride={ride} />
             </div>
