@@ -15,10 +15,10 @@ function getAspireServiceEndpoint(serviceName: string) {
 const apiProxyTarget =
   process.env.VITE_API_PROXY_TARGET ??
   getAspireServiceEndpoint("api") ??
-  "https://localhost:59434";
+  "https://localhost:7129";
 
 const port = Number(process.env.PORT ?? 5173);
-
+console.log(`Vite dev server will run on port ${port}`);
 export default defineConfig({
   plugins: [react()],
   server: {

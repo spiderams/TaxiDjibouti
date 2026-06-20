@@ -21,9 +21,9 @@ export function createRideHubConnection(token: string) {
 
 export async function joinClientLocationGroup(
   connection: signalR.HubConnection,
-  clientId: number,
+  clientId: string,
 ) {
-  await connection.invoke("JoinClientGroup", clientId.toString());
+  await connection.invoke("JoinClientGroup", clientId);
 }
 
 export async function joinRideLocationGroup(
