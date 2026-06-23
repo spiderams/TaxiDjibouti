@@ -32,6 +32,20 @@ builder.Services.AddEndpoints();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IRealtimeNotifier, SignalRRealtimeNotifier>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins(
+                "https://taxi-djibouti.vercel.app",
+                "http://localhost:5173"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
 var app = builder.Build();
 
 app.UseExceptionHandler();
@@ -46,15 +60,15 @@ using (var scope = app.Services.CreateScope())
 
 app.MapDefaultEndpoints();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.MapScalarApiReference();
-}
+//if (app.Environment.IsDevelopment())
+//{
+//    app.MapOpenApi();
+ //   app.MapScalarApiReference();
+//}
 
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.UseCors("Frontend");
 app.MapEndpoints();
 app.MapHub<RideHub>("/hubs/ride");
 
