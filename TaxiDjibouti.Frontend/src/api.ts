@@ -3,10 +3,6 @@ import axios from "axios";
 export type UserRole = "Client" | "Driver" | "Admin";
 export type RideAction = "arrived" | "start" | "complete" | "cancel";
 
-/**
- * Informations sur l'utilisateur authentifié, telles que renvoyées par le backend
- * dans l'objet imbriqué `user` de la réponse d'authentification.
- */
 export interface AuthUser {
   id: string;
   fullName: string;
@@ -14,11 +10,6 @@ export interface AuthUser {
   roles: UserRole[];
 }
 
-/**
- * Réponse d'authentification renvoyée par /api/Auth/login et /api/Auth/register.
- * La forme reflète exactement le DTO backend (AuthResponse) : jeton d'accès,
- * jeton de rafraîchissement, et objet `user` imbriqué contenant les rôles.
- */
 export interface AuthResponse {
   accessToken: string;
   expiresAt: string;
@@ -28,20 +19,12 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
-/**
- * Détermine le rôle le plus privilégié d'un utilisateur authentifié,
- * utilisé pour décider de l'espace vers lequel rediriger (Admin > Driver > Client).
- */
 export function primaryRole(user: AuthUser): UserRole {
   if (user.roles.includes("Admin")) return "Admin";
   if (user.roles.includes("Driver")) return "Driver";
   return "Client";
 }
 
-/**
- * Résumé d'utilisateur renvoyé par /api/admin/users.
- * Reflète le DTO backend UserSummary : id Identity (string GUID) et liste de rôles.
- */
 export interface UserSummary {
   id: string;
   fullName: string;
@@ -49,10 +32,6 @@ export interface UserSummary {
   roles: UserRole[];
 }
 
-/**
- * Profil chauffeur renvoyé par le backend (DriverDto).
- * `id` est l'identifiant métier (int), `userId` l'identifiant Identity (string GUID).
- */
 export interface DriverProfile {
   id: number;
   userId: string;
@@ -63,28 +42,36 @@ export interface DriverProfile {
   averageRating: number;
 }
 
-/**
- * Course renvoyée par le backend (RideDto).
- * `id`/`driverId` sont des identifiants métier (int), `clientId` est un id Identity (string GUID).
- * `status` est l'enum RideStatus sérialisé en string ("Pending", "Accepted", ...).
- */
 export interface Ride {
   id: number;
   clientId: string;
   driverId?: number | null;
+
   pickupAddress: string;
   destinationAddress: string;
+
   pickupZone: string;
+  destinationZone: string;
+
   pickupLatitude?: number | null;
   pickupLongitude?: number | null;
   destinationLatitude?: number | null;
   destinationLongitude?: number | null;
-  destinationZone: string;
+
   estimatedPrice: number;
   status: string;
+
   createdAt: string;
   acceptedAt?: string | null;
   completedAt?: string | null;
+
+  /**
+   * Champs optionnels utiles pour Wave Dispatch.
+   * Ils ne cassent pas le frontend si le backend ne les renvoie pas encore.
+   */
+  offeredDriverIds?: number[];
+  triedDriverIds?: number[];
+  offerExpiresAt?: string | null;
 }
 
 export interface AdminStats {
@@ -92,6 +79,34 @@ export interface AdminStats {
   drivers: number;
   rides: number;
   reports: number;
+}
+
+export interface CreateDriverPayload {
+  licenseNumber: string;
+  vehiclePlate: string;
+  vehicleType: string;
+}
+
+export interface AdminCreateDriverPayload extends CreateDriverPayload {
+  userId: string;
+}
+
+export interface RequestRidePayload {
+  pickupAddress: string;
+  destinationAddress: string;
+  pickupZone: string;
+  destinationZone: string;
+  pickupLatitude?: number | null;
+  pickupLongitude?: number | null;
+  destinationLatitude?: number | null;
+  destinationLongitude?: number | null;
+}
+
+export interface RegisterPayload {
+  fullName: string;
+  phoneNumber: string;
+  password: string;
+  role: UserRole;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -104,18 +119,27 @@ export const http = axios.create({
 http.interceptors.response.use(
   (response) => response,
   (error) => {
+    const data = error.response?.data;
+
     const message =
-      error.response?.data || error.message || "Action impossible";
-    return Promise.reject(
-      new Error(
-        typeof message === "string" ? message : JSON.stringify(message),
-      ),
-    );
+      typeof data === "string"
+        ? data
+        : data?.detail ||
+          data?.title ||
+          data?.message ||
+          error.message ||
+          "Action impossible";
+
+    return Promise.reject(new Error(message));
   },
 );
 
 function authHeader(token: string) {
-  return { headers: { Authorization: `Bearer ${token}` } };
+  return {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  };
 }
 
 export const api = {
@@ -126,22 +150,30 @@ export const api = {
         password,
       })
     ).data,
-  register: async (payload: {
-    fullName: string;
-    phoneNumber: string;
-    password: string;
-    role: UserRole;
-  }) => (await http.post<AuthResponse>("/api/Auth/register", payload)).data,
-  createDriver: async (
-    payload: {
-      licenseNumber: string;
-      vehiclePlate: string;
-      vehicleType: string;
-    },
-    token: string,
-  ) =>
+
+  register: async (payload: RegisterPayload) =>
+    (await http.post<AuthResponse>("/api/Auth/register", payload)).data,
+
+  refreshToken: async (refreshToken: string) =>
+    (await http.post<AuthResponse>("/api/Auth/refresh", { refreshToken })).data,
+
+  createDriver: async (payload: CreateDriverPayload, token: string) =>
     (await http.post<DriverProfile>("/api/Drivers", payload, authHeader(token)))
       .data,
+
+  /**
+   * À utiliser seulement si ton backend a un endpoint Admin dédié.
+   * Si cet endpoint n'existe pas encore, ne l'appelle pas dans main.tsx.
+   */
+  adminCreateDriver: async (payload: AdminCreateDriverPayload, token: string) =>
+    (
+      await http.post<DriverProfile>(
+        "/api/Admin/drivers",
+        payload,
+        authHeader(token),
+      )
+    ).data,
+
   setAvailability: async (isAvailable: boolean, token: string) =>
     (
       await http.post<DriverProfile>(
@@ -150,25 +182,17 @@ export const api = {
         authHeader(token),
       )
     ).data,
-  requestRide: async (
-    payload: {
-      pickupAddress: string;
-      destinationAddress: string;
-      pickupZone: string;
-      destinationZone: string;
-      pickupLatitude?: number | null;
-      pickupLongitude?: number | null;
-      destinationLatitude?: number | null;
-      destinationLongitude?: number | null;
-    },
-    token: string,
-  ) =>
+
+  requestRide: async (payload: RequestRidePayload, token: string) =>
     (await http.post<Ride>("/api/Rides/request", payload, authHeader(token)))
       .data,
+
   myRides: async (token: string) =>
     (await http.get<Ride[]>("/api/Rides/my-rides", authHeader(token))).data,
+
   pendingRides: async (token: string) =>
     (await http.get<Ride[]>("/api/Rides/pending", authHeader(token))).data,
+
   acceptRide: async (rideId: number, token: string) =>
     (
       await http.post<Ride>(
@@ -177,7 +201,37 @@ export const api = {
         authHeader(token),
       )
     ).data,
-  updateRideStatus: async (rideId: number, action: RideAction, token: string) =>
+
+  /**
+   * Alias utile pour Wave Dispatch.
+   * Tu peux utiliser acceptOffer dans l'UI chauffeur au lieu de acceptRide.
+   */
+  acceptOffer: async (rideId: number, token: string) =>
+    (
+      await http.post<Ride>(
+        `/api/Rides/${rideId}/accept`,
+        undefined,
+        authHeader(token),
+      )
+    ).data,
+
+  /**
+   * À utiliser si ton backend expose l'action de refus d'offre.
+   */
+  declineOffer: async (rideId: number, token: string) =>
+    (
+      await http.post<void>(
+        `/api/Rides/${rideId}/decline`,
+        undefined,
+        authHeader(token),
+      )
+    ).data,
+
+  updateRideStatus: async (
+    rideId: number,
+    action: RideAction,
+    token: string,
+  ) =>
     (
       await http.post<Ride>(
         `/api/Rides/${rideId}/${action}`,
@@ -185,13 +239,17 @@ export const api = {
         authHeader(token),
       )
     ).data,
+
   adminStats: async (token: string) =>
     (await http.get<AdminStats>("/api/Admin/stats", authHeader(token))).data,
+
   adminUsers: async (token: string) =>
     (await http.get<UserSummary[]>("/api/Admin/users", authHeader(token))).data,
+
   adminDrivers: async (token: string) =>
     (await http.get<DriverProfile[]>("/api/Admin/drivers", authHeader(token)))
       .data,
+
   adminRides: async (token: string) =>
     (await http.get<Ride[]>("/api/Admin/rides", authHeader(token))).data,
 };
