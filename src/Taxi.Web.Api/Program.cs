@@ -65,10 +65,10 @@ app.MapDefaultEndpoints();
 //    app.MapOpenApi();
  //   app.MapScalarApiReference();
 //}
-
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors("Frontend");
+
 app.MapEndpoints();
 app.MapHub<RideHub>("/hubs/ride");
 
