@@ -50,4 +50,17 @@ internal sealed class SignalRRealtimeNotifier(
             logger.LogWarning(ex, "Realtime notify (rideOffered) failed for ride {RideId}", rideId);
         }
     }
+
+    public async Task RideOfferRevokedAsync(string driverUserId, int rideId, string reason, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await hub.Clients.Group($"DriverUser_{driverUserId}")
+                .SendAsync("rideOfferRevoked", new { rideId, reason }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Realtime notify (rideOfferRevoked) failed for ride {RideId}", rideId);
+        }
+    }
 }

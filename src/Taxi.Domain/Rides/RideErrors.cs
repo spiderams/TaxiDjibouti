@@ -18,4 +18,5 @@ public static class RideErrors
     public static readonly Error NotOffered = Error.Conflict("Ride.NotOffered", "Cette course n'est pas en cours d'offre.");
     public static readonly Error OfferMismatch = Error.Forbidden("Ride.OfferMismatch", "Cette offre ne vous concerne pas.");
     public static readonly Error OfferExpired = Error.Conflict("Ride.OfferExpired", "Cette offre a expiré.");
+    public static readonly Error OfferTaken = Error.Conflict("Ride.OfferTaken", "Cette course vient d'être prise par un autre chauffeur.");
 }

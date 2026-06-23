@@ -28,14 +28,17 @@ internal sealed class DeclineOfferCommandHandler(
         if (ride is null)
             return Result.Failure<RideDto>(RideErrors.NotFound);
 
-        if (ride.Status != RideStatus.Offered || ride.OfferedDriverId != driver.Id)
-            return Result.Failure<RideDto>(RideErrors.OfferMismatch);
-
         ride.MarkDriverTried(driver.Id);
-        ride.ReturnToPending();
+        var declined = ride.DeclineOffer(driver.Id);
+        if (declined.IsFailure)
+            return Result.Failure<RideDto>(declined.Error);
+
         await rides.UpdateAsync(ride, cancellationToken);
 
-        await dispatcher.DispatchAsync(ride.Id, cancellationToken);
+        // Si la vague est vidée, la course est repassée en Pending → on relance vers la vague suivante.
+        if (ride.Status == RideStatus.Pending)
+            await dispatcher.DispatchAsync(ride.Id, cancellationToken);
+
         return RideDto.From(ride);
     }
 }

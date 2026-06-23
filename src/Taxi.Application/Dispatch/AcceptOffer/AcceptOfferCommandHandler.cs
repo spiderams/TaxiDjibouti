@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Taxi.Application.Abstractions;
 using Taxi.Application.Drivers;
@@ -31,18 +32,43 @@ internal sealed partial class AcceptOfferCommandHandler(
         if (ride is null)
             return Result.Failure<RideDto>(RideErrors.NotFound);
 
+        // Capture des perdants AVANT mutation (la vague est vidée par AcceptOffer).
+        var losers = ride.OfferedDriverIds.Where(id => id != driver.Id).ToList();
+
         var accepted = ride.AcceptOffer(driver.Id);
         if (accepted.IsFailure)
             return Result.Failure<RideDto>(accepted.Error);
 
-        await rides.UpdateAsync(ride, cancellationToken);
+        try
+        {
+            await rides.UpdateAsync(ride, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Un autre chauffeur de la vague a gagné la course entre la lecture et l'écriture.
+            return Result.Failure<RideDto>(RideErrors.OfferTaken);
+        }
 
         driver.SetAvailability(false);
         await drivers.UpdateAsync(driver, cancellationToken);
         LogOfferAccepted(logger, ride.Id, driver.Id);
 
+        await RevokeLosersAsync(losers, ride.Id, "taken", cancellationToken);
         await notifier.RideStatusChangedAsync(ride.Id, ride.ClientId, ride.DriverId, ride.Status.ToString(), cancellationToken);
         return RideDto.From(ride);
+    }
+
+    /// <summary>
+    /// Révoque l'offre auprès des chauffeurs perdants de la vague en résolvant leur identifiant utilisateur SignalR.
+    /// </summary>
+    private async Task RevokeLosersAsync(IReadOnlyCollection<int> loserDriverIds, int rideId, string reason, CancellationToken cancellationToken)
+    {
+        if (loserDriverIds.Count == 0)
+            return;
+
+        var losers = await drivers.ListAsync(new DriversByIdsSpec(loserDriverIds), cancellationToken);
+        foreach (var loser in losers)
+            await notifier.RideOfferRevokedAsync(loser.UserId, rideId, reason, cancellationToken);
     }
 
     [LoggerMessage(Level = LogLevel.Information,

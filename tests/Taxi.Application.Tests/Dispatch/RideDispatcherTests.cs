@@ -10,6 +10,10 @@ using Xunit;
 
 namespace Taxi.Application.Tests.Dispatch;
 
+/// <summary>
+/// Tests de régression du dispatcher adaptés à la nouvelle API de vague.
+/// Les cas couvrant la logique de vague complète se trouvent dans RideDispatcherWaveTests.
+/// </summary>
 public class RideDispatcherTests
 {
     private readonly Mock<IDriverLocator> _locator = new();
@@ -35,7 +39,7 @@ public class RideDispatcherTests
         await Dispatcher().DispatchAsync(1, CancellationToken.None);
 
         ride.Status.Should().Be(RideStatus.Offered);
-        ride.OfferedDriverId.Should().Be(5);
+        ride.OfferedDriverIds.Should().Contain(5);
         _notifier.Verify(n => n.RideOfferedAsync("driver-5", It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -55,7 +59,8 @@ public class RideDispatcherTests
 
         await Dispatcher().DispatchAsync(1, CancellationToken.None);
 
-        ride.OfferedDriverId.Should().Be(8);
+        ride.OfferedDriverIds.Should().Contain(8);
+        ride.OfferedDriverIds.Should().NotContain(5);
     }
 
     [Fact]

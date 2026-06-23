@@ -12,9 +12,26 @@ export interface DriverLocationPayload {
   sentAt?: string;
 }
 
+export interface RideOfferPayload {
+  rideId: number;
+  expiresAt: string;
+  pickupAddress?: string;
+  destinationAddress?: string;
+  pickupZone?: string;
+  destinationZone?: string;
+  estimatedPrice?: number;
+}
+
+export interface RideOfferRevokedPayload {
+  rideId: number;
+  reason: "taken" | "expired" | "cancelled" | string;
+}
+
 export function createRideHubConnection(token: string) {
   return new signalR.HubConnectionBuilder()
-    .withUrl(`${API_BASE_URL}/hubs/ride`, { accessTokenFactory: () => token })
+    .withUrl(`${API_BASE_URL}/hubs/ride`, {
+      accessTokenFactory: () => token,
+    })
     .withAutomaticReconnect()
     .build();
 }
@@ -44,4 +61,25 @@ export async function sendDriverLocation(
   location: DriverLocationPayload,
 ) {
   await connection.invoke("SendDriverLocation", location);
+}
+
+export function onDriverLocationUpdated(
+  connection: signalR.HubConnection,
+  callback: (payload: DriverLocationPayload) => void,
+) {
+  connection.on("driverLocationUpdated", callback);
+}
+
+export function onRideOffered(
+  connection: signalR.HubConnection,
+  callback: (payload: RideOfferPayload) => void,
+) {
+  connection.on("rideOffered", callback);
+}
+
+export function onRideOfferRevoked(
+  connection: signalR.HubConnection,
+  callback: (payload: RideOfferRevokedPayload) => void,
+) {
+  connection.on("rideOfferRevoked", callback);
 }

@@ -23,7 +23,12 @@ public sealed class Ride : Entity
     public RideStatus Status { get; private set; }
     public DateTime? AcceptedAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
-    public int? OfferedDriverId { get; private set; }
+    private readonly List<int> _offeredDriverIds = [];
+
+    /// <summary>
+    /// Chauffeurs de la vague en cours auxquels la course est actuellement offerte (premier arrivé gagne).
+    /// </summary>
+    public IReadOnlyCollection<int> OfferedDriverIds => _offeredDriverIds.AsReadOnly();
     public DateTime? OfferExpiresAt { get; private set; }
     public List<int> TriedDriverIds { get; private set; } = [];
 
@@ -138,31 +143,37 @@ public sealed class Ride : Entity
     }
 
     /// <summary>
-    /// Propose la course à un chauffeur spécifique avec une fenêtre d'expiration :
-    /// passe au statut <see cref="RideStatus.Offered"/> et bloque la course pour les autres chauffeurs
-    /// le temps que l'offre soit acceptée ou expire.
+    /// Propose la course à une vague de chauffeurs simultanément avec une fenêtre d'expiration commune :
+    /// passe au statut <see cref="RideStatus.Offered"/>, enregistre la vague et marque ces chauffeurs comme essayés.
     /// </summary>
-    public Result Offer(int driverId, DateTime expiresAt)
+    public Result OfferWave(IEnumerable<int> driverIds, DateTime expiresAt)
     {
         if (Status != RideStatus.Pending)
             return Result.Failure(RideErrors.NotPending);
 
+        _offeredDriverIds.Clear();
+        foreach (var id in driverIds)
+        {
+            if (!_offeredDriverIds.Contains(id))
+                _offeredDriverIds.Add(id);
+            MarkDriverTried(id);
+        }
+
         Status = RideStatus.Offered;
-        OfferedDriverId = driverId;
         OfferExpiresAt = expiresAt;
         return Result.Success();
     }
 
     /// <summary>
-    /// Confirme l'acceptation d'une offre par le chauffeur ciblé :
-    /// vérifie que le chauffeur est bien le destinataire de l'offre et que celle-ci n'a pas expiré,
-    /// puis fait passer la course à <see cref="RideStatus.Accepted"/>.
+    /// Confirme l'acceptation d'une offre par un chauffeur de la vague : vérifie qu'il fait partie de la vague
+    /// en cours et que celle-ci n'a pas expiré, puis fait passer la course à <see cref="RideStatus.Accepted"/>.
+    /// Le premier chauffeur à accepter gagne ; les suivants échoueront car le statut n'est plus <c>Offered</c>.
     /// </summary>
     public Result AcceptOffer(int driverId)
     {
         if (Status != RideStatus.Offered)
             return Result.Failure(RideErrors.NotOffered);
-        if (OfferedDriverId != driverId)
+        if (!_offeredDriverIds.Contains(driverId))
             return Result.Failure(RideErrors.OfferMismatch);
         if (OfferExpiresAt is null || OfferExpiresAt <= DateTime.UtcNow)
             return Result.Failure(RideErrors.OfferExpired);
@@ -170,14 +181,34 @@ public sealed class Ride : Entity
         DriverId = driverId;
         Status = RideStatus.Accepted;
         AcceptedAt = DateTime.UtcNow;
-        OfferedDriverId = null;
+        _offeredDriverIds.Clear();
         OfferExpiresAt = null;
         return Result.Success();
     }
 
     /// <summary>
-    /// Remet la course au statut <see cref="RideStatus.Pending"/> lorsqu'une offre expire ou est refusée,
-    /// permettant au système d'en proposer une nouvelle à un autre chauffeur.
+    /// Refus d'une offre par un chauffeur de la vague : le retire de la vague en cours. Si la vague devient vide,
+    /// la course retourne au statut <see cref="RideStatus.Pending"/> afin d'être réattribuée.
+    /// </summary>
+    public Result DeclineOffer(int driverId)
+    {
+        if (Status != RideStatus.Offered)
+            return Result.Failure(RideErrors.NotOffered);
+        if (!_offeredDriverIds.Contains(driverId))
+            return Result.Failure(RideErrors.OfferMismatch);
+
+        _offeredDriverIds.Remove(driverId);
+        if (_offeredDriverIds.Count == 0)
+        {
+            Status = RideStatus.Pending;
+            OfferExpiresAt = null;
+        }
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Remet la course au statut <see cref="RideStatus.Pending"/> lorsqu'une vague expire,
+    /// permettant au système de proposer une nouvelle vague à d'autres chauffeurs.
     /// </summary>
     public Result ReturnToPending()
     {
@@ -185,7 +216,7 @@ public sealed class Ride : Entity
             return Result.Failure(RideErrors.InvalidTransition);
 
         Status = RideStatus.Pending;
-        OfferedDriverId = null;
+        _offeredDriverIds.Clear();
         OfferExpiresAt = null;
         return Result.Success();
     }

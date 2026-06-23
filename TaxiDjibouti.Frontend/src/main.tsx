@@ -42,19 +42,41 @@ const zones = [
   "PK12",
   "Arhiba",
 ];
+
 const storageKey = "taxi-djibouti-auth";
+
 const defaultDjiboutiDriverLocation: MapPoint = {
   latitude: 11.5721,
   longitude: 43.1456,
 };
+
 const djiboutiDriverFallbackRadiusKm = 70;
 const djiboutiMapBounds = L.latLngBounds([11.35, 42.85], [11.85, 43.45]);
 
+function loadSavedSession() {
+  const saved = localStorage.getItem(storageKey);
+
+  if (!saved) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(saved) as AuthResponse;
+
+    if (!parsed.accessToken || !parsed.user?.id || !parsed.user?.roles) {
+      localStorage.removeItem(storageKey);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    localStorage.removeItem(storageKey);
+    return null;
+  }
+}
+
 function App() {
-  const [session, setSession] = useState<AuthResponse | null>(() => {
-    const saved = localStorage.getItem(storageKey);
-    return saved ? (JSON.parse(saved) as AuthResponse) : null;
-  });
+  const [session, setSession] = useState<AuthResponse | null>(loadSavedSession);
 
   const saveSession = (auth: AuthResponse) => {
     localStorage.setItem(storageKey, JSON.stringify(auth));
@@ -74,11 +96,13 @@ function App() {
             <span className="rounded-2xl bg-taxi-yellow px-3 py-2">🚕</span>
             Taxi Djibouti
           </Link>
+
           <nav className="hidden items-center gap-2 md:flex">
             <NavLink to="/client">Client</NavLink>
             <NavLink to="/chauffeur">Chauffeur</NavLink>
             <NavLink to="/admin">Admin</NavLink>
           </nav>
+
           {session ? (
             <button className="btn-secondary" onClick={logout}>
               Déconnexion
@@ -93,10 +117,12 @@ function App() {
         <main className="mx-auto w-[min(1180px,calc(100%-32px))] pb-16">
           <Routes>
             <Route path="/" element={<Home session={session} />} />
+
             <Route
               path="/login"
               element={<AuthPage onAuthenticated={saveSession} />}
             />
+
             <Route
               path="/client"
               element={
@@ -105,6 +131,7 @@ function App() {
                 </Protected>
               }
             />
+
             <Route
               path="/chauffeur"
               element={
@@ -113,6 +140,7 @@ function App() {
                 </Protected>
               }
             />
+
             <Route
               path="/admin"
               element={
@@ -121,6 +149,7 @@ function App() {
                 </Protected>
               }
             />
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
@@ -131,6 +160,7 @@ function App() {
 
 function Home({ session }: { session: AuthResponse | null }) {
   const role = session ? primaryRole(session.user) : null;
+
   const dashboardLink =
     role === "Admin"
       ? "/admin"
@@ -144,27 +174,33 @@ function Home({ session }: { session: AuthResponse | null }) {
         <span className="badge bg-taxi-yellow text-taxi-navy">
           MVP Taxi Djibouti
         </span>
+
         <h1 className="mt-5 max-w-4xl text-5xl font-black leading-none tracking-[-0.06em] md:text-7xl">
           Trois espaces simples pour réserver, conduire et administrer.
         </h1>
+
         <p className="mt-5 max-w-2xl text-lg text-blue-100">
           React + Vite + Tailwind CSS avec Axios, React Router, SignalR prêt
           pour le temps réel et Leaflet/OpenStreetMap prévu pour la carte.
         </p>
+
         <div className="mt-8 flex flex-wrap gap-3">
           <Link className="btn-yellow" to={session ? dashboardLink : "/login"}>
             {session ? "Ouvrir mon espace" : "Commencer"}
           </Link>
+
           <a className="btn-light" href="#roadmap">
             Voir la roadmap
           </a>
         </div>
       </div>
+
       <div className="card flex flex-col justify-end bg-taxi-yellow p-8">
         <span className="text-6xl">🚕</span>
         <strong className="mt-6 text-2xl">Centre-ville → Balbala</strong>
         <span className="text-taxi-navy/70">Prix estimé dès 1 500 FDJ</span>
       </div>
+
       <div id="roadmap" className="grid gap-4 lg:col-span-2 md:grid-cols-3">
         <FeatureCard
           title="1. Espace Client"
@@ -175,6 +211,7 @@ function Home({ session }: { session: AuthResponse | null }) {
             "Voir prix estimé et statut",
           ]}
         />
+
         <FeatureCard
           title="2. Espace Chauffeur"
           items={[
@@ -184,6 +221,7 @@ function Home({ session }: { session: AuthResponse | null }) {
             "Changer le statut",
           ]}
         />
+
         <FeatureCard
           title="3. Espace Admin"
           items={[
@@ -222,8 +260,11 @@ function AuthPage({
         mode === "login"
           ? await api.login(phoneNumber, password)
           : await api.register({ fullName, phoneNumber, password, role });
+
       onAuthenticated(auth);
+
       const userRole = primaryRole(auth.user);
+
       navigate(
         userRole === "Admin"
           ? "/admin"
@@ -247,6 +288,7 @@ function AuthPage({
         >
           Connexion
         </button>
+
         <button
           className={mode === "register" ? "tab-active" : "tab"}
           onClick={() => setMode("register")}
@@ -254,21 +296,25 @@ function AuthPage({
           Inscription
         </button>
       </div>
+
       <form onSubmit={submit} className="grid gap-4">
         {mode === "register" && (
           <Field label="Nom complet" value={fullName} onChange={setFullName} />
         )}
+
         <Field
           label="Téléphone"
           value={phoneNumber}
           onChange={setPhoneNumber}
         />
+
         <Field
           label="Mot de passe"
           type="password"
           value={password}
           onChange={setPassword}
         />
+
         {mode === "register" && (
           <label className="field-label">
             Rôle
@@ -283,11 +329,13 @@ function AuthPage({
             </select>
           </label>
         )}
+
         {error && (
           <p className="rounded-2xl bg-red-100 p-3 font-bold text-red-700">
             {error}
           </p>
         )}
+
         <button className="btn-primary" disabled={loading}>
           {loading ? "Chargement..." : "Continuer"}
         </button>
@@ -308,9 +356,12 @@ function ClientSpace({ session }: { session: AuthResponse }) {
   const [driverLocation, setDriverLocation] = useState<MapPoint | null>(null);
   const [rides, setRides] = useState<Ride[]>([]);
   const [message, setMessage] = useState("");
+
   const token = session.accessToken;
 
-  const refresh = async () => setRides(await api.myRides(token));
+  const refresh = async () => {
+    setRides(await api.myRides(token));
+  };
 
   useEffect(() => {
     refresh().catch(showError(setMessage));
@@ -338,6 +389,7 @@ function ClientSpace({ session }: { session: AuthResponse }) {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+
     await run(
       setMessage,
       async () => {
@@ -354,6 +406,7 @@ function ClientSpace({ session }: { session: AuthResponse }) {
           },
           token,
         );
+
         await refresh();
       },
       "Course demandée avec succès.",
@@ -367,9 +420,11 @@ function ClientSpace({ session }: { session: AuthResponse }) {
       icon="🙋🏽"
     >
       {message && <Notice>{message}</Notice>}
+
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="card p-6">
           <h2 className="section-title">Carte départ / destination</h2>
+
           <MapPicker
             pickup={pickupPoint}
             destination={destinationPoint}
@@ -377,6 +432,7 @@ function ClientSpace({ session }: { session: AuthResponse }) {
             onPickupChange={setPickupPoint}
             onDestinationChange={setDestinationPoint}
           />
+
           <p className="mt-3 text-sm text-slate-500">
             Le premier clic place le départ, le deuxième clic place la
             destination. Les coordonnées sont gardées côté frontend pour
@@ -386,45 +442,55 @@ function ClientSpace({ session }: { session: AuthResponse }) {
 
         <section className="card p-6">
           <h2 className="section-title">Demander un taxi</h2>
+
           <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
             <Field
               label="Adresse départ"
               value={pickupAddress}
               onChange={setPickupAddress}
             />
+
             <Field
               label="Adresse destination"
               value={destinationAddress}
               onChange={setDestinationAddress}
             />
+
             <ZoneSelect
               label="Zone départ"
               value={pickupZone}
               onChange={setPickupZone}
             />
+
             <ZoneSelect
               label="Zone destination"
               value={destinationZone}
               onChange={setDestinationZone}
             />
+
             <CoordinatePreview label="Coordonnées départ" point={pickupPoint} />
+
             <CoordinatePreview
               label="Coordonnées destination"
               point={destinationPoint}
             />
+
             <CoordinatePreview
               label="Position chauffeur"
               point={driverLocation}
             />
+
             <div className="rounded-3xl bg-taxi-sand p-4 font-black md:col-span-2">
               Prix estimé : {estimatePrice(pickupZone, destinationZone)} FDJ
             </div>
+
             <button className="btn-primary md:col-span-2">
               Demander la course
             </button>
           </form>
         </section>
       </div>
+
       <FuturePanel
         title="Prochaine évolution temps réel"
         items={[
@@ -433,6 +499,7 @@ function ClientSpace({ session }: { session: AuthResponse }) {
           "Déplacer un marker chauffeur sur cette carte côté client",
         ]}
       />
+
       <RideList rides={rides} title="Mes courses" />
     </SpaceShell>
   );
@@ -446,10 +513,13 @@ function DriverSpace({ session }: { session: AuthResponse }) {
   const [licenseNumber, setLicenseNumber] = useState("LIC-001");
   const [vehiclePlate, setVehiclePlate] = useState("DJ-1234");
   const [vehicleType, setVehicleType] = useState("Taxi");
+
   const token = session.accessToken;
+
   const locationConnectionRef = useRef<ReturnType<
     typeof createRideHubConnection
   > | null>(null);
+
   const locationWatchIdRef = useRef<number | null>(null);
   const locationStopTimerRef = useRef<number | null>(null);
 
@@ -489,6 +559,7 @@ function DriverSpace({ session }: { session: AuthResponse }) {
     }
 
     setTrackingRideId(null);
+
     if (showStoppedMessage) {
       setMessage("Partage de position chauffeur arrêté.");
     }
@@ -513,8 +584,10 @@ function DriverSpace({ session }: { session: AuthResponse }) {
     try {
       const connection = createRideHubConnection(token);
       await connection.start();
+
       locationConnectionRef.current = connection;
       setTrackingRideId(rideId);
+
       setMessage(
         "Partage de position chauffeur démarré. Position test Djibouti utilisée si le GPS est hors zone.",
       );
@@ -530,12 +603,15 @@ function DriverSpace({ session }: { session: AuthResponse }) {
       }
 
       let lastSentAt = 0;
+
       locationWatchIdRef.current = navigator.geolocation.watchPosition(
         async (position) => {
           const now = Date.now();
+
           if (now - lastSentAt < 5000) {
             return;
           }
+
           lastSentAt = now;
 
           const point = normalizeDriverLocation({
@@ -574,13 +650,16 @@ function DriverSpace({ session }: { session: AuthResponse }) {
       icon="🚖"
     >
       {message && <Notice>{message}</Notice>}
+
       <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
         <section className="card p-6">
           <h2 className="section-title">Profil chauffeur</h2>
+
           <form
             className="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault();
+
               action(
                 () =>
                   api.createDriver(
@@ -600,18 +679,22 @@ function DriverSpace({ session }: { session: AuthResponse }) {
               value={licenseNumber}
               onChange={setLicenseNumber}
             />
+
             <Field
               label="Plaque"
               value={vehiclePlate}
               onChange={setVehiclePlate}
             />
+
             <Field
               label="Véhicule"
               value={vehicleType}
               onChange={setVehicleType}
             />
+
             <button className="btn-primary">Créer un profil</button>
           </form>
+
           <button
             className="btn-yellow mt-4 w-full"
             onClick={() =>
@@ -624,6 +707,7 @@ function DriverSpace({ session }: { session: AuthResponse }) {
             Me mettre disponible
           </button>
         </section>
+
         <RideList
           rides={pendingRides}
           title="Courses en attente"
@@ -639,6 +723,7 @@ function DriverSpace({ session }: { session: AuthResponse }) {
           )}
         />
       </div>
+
       <RideList
         rides={myRides}
         title="Mes courses chauffeur"
@@ -662,13 +747,13 @@ function AdminSpace({ session }: { session: AuthResponse }) {
   const [drivers, setDrivers] = useState<DriverProfile[]>([]);
   const [rides, setRides] = useState<Ride[]>([]);
   const [message, setMessage] = useState("");
-  const [driverUserId, setDriverUserId] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("LIC-ADMIN");
   const [vehiclePlate, setVehiclePlate] = useState("DJ-0001");
   const [vehicleType, setVehicleType] = useState("Taxi");
   const [adminDriverLocations, setAdminDriverLocations] = useState<
     Record<number, DriverLocationPayload>
   >({});
+
   const token = session.accessToken;
 
   const refresh = async () => {
@@ -678,6 +763,7 @@ function AdminSpace({ session }: { session: AuthResponse }) {
       api.adminDrivers(token),
       api.adminRides(token),
     ]);
+
     setStats(nextStats);
     setUsers(nextUsers);
     setDrivers(nextDrivers);
@@ -708,17 +794,19 @@ function AdminSpace({ session }: { session: AuthResponse }) {
 
   const createDriver = (event: React.FormEvent) => {
     event.preventDefault();
+
     run(
       setMessage,
       async () => {
         await api.createDriver(
-          {           
+          {
             licenseNumber,
             vehiclePlate,
             vehicleType,
           },
           token,
         );
+
         await refresh();
       },
       "Chauffeur créé ou mis à jour.",
@@ -732,40 +820,43 @@ function AdminSpace({ session }: { session: AuthResponse }) {
       icon="🛡️"
     >
       {message && <Notice>{message}</Notice>}
+
       <section className="grid gap-4 md:grid-cols-4">
         <StatCard label="Utilisateurs" value={stats?.users ?? 0} />
         <StatCard label="Chauffeurs" value={stats?.drivers ?? 0} />
         <StatCard label="Courses" value={stats?.rides ?? 0} />
         <StatCard label="Signalements" value={stats?.reports ?? 0} />
       </section>
+
       <AdminLiveMap locations={Object.values(adminDriverLocations)} />
+
       <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
         <section className="card p-6">
           <h2 className="section-title">Créer un chauffeur</h2>
+
           <form className="grid gap-4" onSubmit={createDriver}>
-            <Field
-              label="ID utilisateur Driver"
-              value={driverUserId}
-              onChange={setDriverUserId}
-            />
             <Field
               label="Numéro de permis"
               value={licenseNumber}
               onChange={setLicenseNumber}
             />
+
             <Field
               label="Plaque"
               value={vehiclePlate}
               onChange={setVehiclePlate}
             />
+
             <Field
               label="Véhicule"
               value={vehicleType}
               onChange={setVehicleType}
             />
+
             <button className="btn-primary">Créer / mettre à jour</button>
           </form>
         </section>
+
         <SimpleTable
           title="Utilisateurs"
           rows={users.map((u) => [
@@ -775,6 +866,7 @@ function AdminSpace({ session }: { session: AuthResponse }) {
           ])}
         />
       </div>
+
       <SimpleTable
         title="Chauffeurs"
         rows={drivers.map((d) => [
@@ -783,6 +875,7 @@ function AdminSpace({ session }: { session: AuthResponse }) {
           d.isAvailable ? "Disponible" : "Indisponible",
         ])}
       />
+
       <RideList rides={rides} title="Toutes les courses" />
     </SpaceShell>
   );
@@ -815,6 +908,7 @@ function DriverRideAction({
           {trackingRideId === ride.id ? "Position active" : "Partager position"}
         </button>
       )}
+
       {ride.status === "Accepted" && (
         <button
           className="btn-yellow"
@@ -828,6 +922,7 @@ function DriverRideAction({
           Arrivé
         </button>
       )}
+
       {ride.status === "DriverArrived" && (
         <button
           className="btn-yellow"
@@ -841,6 +936,7 @@ function DriverRideAction({
           Commencer
         </button>
       )}
+
       {ride.status === "InProgress" && (
         <button
           className="btn-yellow"
@@ -876,9 +972,11 @@ function distanceInKm(from: MapPoint, to: MapPoint) {
   const dLon = degreesToRadians(to.longitude - from.longitude);
   const lat1 = degreesToRadians(from.latitude);
   const lat2 = degreesToRadians(to.latitude);
+
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+
   return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -895,9 +993,13 @@ function Protected({
   role: UserRole;
   children: React.ReactNode;
 }) {
-  if (!session) return <Navigate to="/login" replace />;
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
   const userRole = primaryRole(session.user);
-  if (userRole !== role)
+
+  if (userRole !== role) {
     return (
       <Navigate
         to={
@@ -910,6 +1012,8 @@ function Protected({
         replace
       />
     );
+  }
+
   return children;
 }
 
@@ -928,6 +1032,7 @@ function SpaceShell({
     <section className="grid gap-5">
       <div className="card flex items-center gap-4 p-6">
         <span className="text-5xl">{icon}</span>
+
         <div>
           <h1 className="text-3xl font-black tracking-tight md:text-4xl">
             {title}
@@ -935,6 +1040,7 @@ function SpaceShell({
           <p className="text-slate-600">{subtitle}</p>
         </div>
       </div>
+
       {children}
     </section>
   );
@@ -952,10 +1058,12 @@ function RideList({
   return (
     <section className="card p-6">
       <h2 className="section-title">{title}</h2>
+
       <div className="grid gap-3">
         {rides.length === 0 && (
           <p className="text-slate-500">Aucune course à afficher.</p>
         )}
+
         {rides.map((ride) => (
           <article
             key={ride.id}
@@ -965,19 +1073,24 @@ function RideList({
               <strong>
                 #{ride.id} · {ride.pickupAddress} → {ride.destinationAddress}
               </strong>
+
               <p className="text-sm text-slate-600">
                 {ride.pickupZone} vers {ride.destinationZone} ·{" "}
                 {ride.estimatedPrice} FDJ
               </p>
+
               <p className="text-xs text-slate-500">
                 Client : {ride.clientId} · Chauffeur :{" "}
                 {ride.driverId ?? "non assigné"}
               </p>
+
               <RideTimeline ride={ride} />
             </div>
+
             <span className={`status status-${ride.status.toLowerCase()}`}>
               {ride.status}
             </span>
+
             {renderAction?.(ride)}
           </article>
         ))}
@@ -1025,6 +1138,7 @@ function AdminLiveMap({ locations }: { locations: DriverLocationPayload[] }) {
 
   useEffect(() => {
     const map = mapRef.current;
+
     if (!map) {
       return;
     }
@@ -1034,8 +1148,15 @@ function AdminLiveMap({ locations }: { locations: DriverLocationPayload[] }) {
     locations.forEach((location) => {
       const key = location.driverId ?? location.rideId;
       activeKeys.add(key);
+
       const latLng = normalizeAdminLocation(location);
-      const popup = `Chauffeur #${location.driverId ?? "inconnu"}<br>Course #${location.rideId}<br>${latLng.lat.toFixed(6)}, ${latLng.lng.toFixed(6)}`;
+
+      const popup = `Chauffeur #${
+        location.driverId ?? "inconnu"
+      }<br>Course #${location.rideId}<br>${latLng.lat.toFixed(
+        6,
+      )}, ${latLng.lng.toFixed(6)}`;
+
       const existingMarker = markersRef.current.get(key);
 
       if (existingMarker) {
@@ -1061,6 +1182,7 @@ function AdminLiveMap({ locations }: { locations: DriverLocationPayload[] }) {
   return (
     <section className="card p-6">
       <h2 className="section-title">Carte Admin live</h2>
+
       <div className="overflow-hidden rounded-[1.75rem] border border-slate-200">
         <div
           ref={containerRef}
@@ -1068,12 +1190,14 @@ function AdminLiveMap({ locations }: { locations: DriverLocationPayload[] }) {
           aria-label="Carte admin des chauffeurs actifs"
         />
       </div>
+
       <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
         {locations.length === 0 && (
           <p className="rounded-2xl bg-slate-50 p-3 md:col-span-2">
             Aucune position chauffeur active reçue pour le moment.
           </p>
         )}
+
         {locations.map((location) => (
           <p
             key={`${location.driverId ?? "driver"}-${location.rideId}`}
@@ -1092,6 +1216,7 @@ function AdminLiveMap({ locations }: { locations: DriverLocationPayload[] }) {
 
 function normalizeAdminLocation(location: DriverLocationPayload) {
   const latLng = L.latLng(location.latitude, location.longitude);
+
   return djiboutiMapBounds.contains(latLng)
     ? latLng
     : L.latLng(
@@ -1138,6 +1263,7 @@ function formatDateTime(value?: string | null) {
   }
 
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -1203,6 +1329,7 @@ function ZoneSelect({
   return (
     <label className="field-label">
       {label}
+
       <select
         className="field"
         value={value}
@@ -1222,6 +1349,7 @@ function FeatureCard({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="card p-6">
       <h2 className="section-title">{title}</h2>
+
       <ul className="grid gap-2 text-slate-600">
         {items.map((item) => (
           <li key={item}>✅ {item}</li>
@@ -1235,6 +1363,7 @@ function FuturePanel({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="card bg-taxi-navy p-6 text-white">
       <h2 className="section-title">{title}</h2>
+
       <ul className="grid gap-3 text-blue-100">
         {items.map((item) => (
           <li key={item}>• {item}</li>
@@ -1257,8 +1386,10 @@ function SimpleTable({ title, rows }: { title: string; rows: string[][] }) {
   return (
     <section className="card overflow-hidden p-6">
       <h2 className="section-title">{title}</h2>
+
       <div className="grid gap-2">
         {rows.length === 0 && <p className="text-slate-500">Aucune donnée.</p>}
+
         {rows.map((row, index) => (
           <div
             className="grid gap-2 rounded-2xl bg-white p-3 text-sm md:grid-cols-3"
@@ -1297,10 +1428,18 @@ function estimatePrice(from: string, to: string) {
   if (
     (from === "Centre-ville" && to === "Balbala") ||
     (from === "Balbala" && to === "Centre-ville")
-  )
+  ) {
     return 1500;
-  if (from === "Aéroport" && to === "Centre-ville") return 2500;
-  if (from === "Héron" && to === "Centre-ville") return 1200;
+  }
+
+  if (from === "Aéroport" && to === "Centre-ville") {
+    return 2500;
+  }
+
+  if (from === "Héron" && to === "Centre-ville") {
+    return 1200;
+  }
+
   return 1000;
 }
 
@@ -1310,6 +1449,7 @@ async function run(
   success: string,
 ) {
   setMessage("");
+
   try {
     await callback();
     setMessage(success);

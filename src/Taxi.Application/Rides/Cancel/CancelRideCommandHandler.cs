@@ -24,6 +24,12 @@ internal sealed class CancelRideCommandHandler(
         if (ride is null)
             return Result.Failure<RideDto>(RideErrors.NotFound);
 
+        // Capture de la vague d'offre AVANT mutation : si la course est annulée pendant qu'elle est offerte,
+        // ces chauffeurs doivent voir leur offre révoquée.
+        var offeredWave = ride.Status == RideStatus.Offered
+            ? ride.OfferedDriverIds.ToList()
+            : [];
+
         Result outcome;
         if (command.IsDriver)
         {
@@ -45,6 +51,13 @@ internal sealed class CancelRideCommandHandler(
             return Result.Failure<RideDto>(outcome.Error);
 
         await rides.UpdateAsync(ride, cancellationToken);
+
+        if (offeredWave.Count > 0)
+        {
+            var waveDrivers = await drivers.ListAsync(new DriversByIdsSpec(offeredWave), cancellationToken);
+            foreach (var waveDriver in waveDrivers)
+                await notifier.RideOfferRevokedAsync(waveDriver.UserId, ride.Id, "cancelled", cancellationToken);
+        }
         if (ride.DriverId is not null)
         {
             var assigned = await drivers.FirstOrDefaultAsync(new DriverByIdSpec(ride.DriverId.Value), cancellationToken);

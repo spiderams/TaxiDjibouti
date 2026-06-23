@@ -3,7 +3,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Taxi.Application.Abstractions;
 using Taxi.Application.Dispatch;
+using Taxi.Application.Drivers;
+using Taxi.Application.Realtime;
 using Taxi.Application.Rides;
+using Taxi.Domain.Drivers;
 using Taxi.Domain.Rides;
 
 namespace Taxi.Infrastructure.Dispatch;
@@ -23,15 +26,27 @@ internal sealed partial class OfferTimeoutService(
             {
                 using var scope = scopeFactory.CreateScope();
                 var rides = scope.ServiceProvider.GetRequiredService<IRepository<Ride>>();
+                var drivers = scope.ServiceProvider.GetRequiredService<IRepository<Driver>>();
+                var notifier = scope.ServiceProvider.GetRequiredService<IRealtimeNotifier>();
                 var dispatcher = scope.ServiceProvider.GetRequiredService<IRideDispatcher>();
 
                 var expired = await rides.ListAsync(new ExpiredOffersSpec(DateTime.UtcNow), stoppingToken);
                 foreach (var ride in expired)
                 {
-                    if (ride.OfferedDriverId is not null)
-                        ride.MarkDriverTried(ride.OfferedDriverId.Value);
+                    var waveDriverIds = ride.OfferedDriverIds.ToList();
+                    foreach (var driverId in waveDriverIds)
+                        ride.MarkDriverTried(driverId);
+
                     ride.ReturnToPending();
                     await rides.UpdateAsync(ride, stoppingToken);
+
+                    if (waveDriverIds.Count > 0)
+                    {
+                        var waveDrivers = await drivers.ListAsync(new DriversByIdsSpec(waveDriverIds), stoppingToken);
+                        foreach (var driver in waveDrivers)
+                            await notifier.RideOfferRevokedAsync(driver.UserId, ride.Id, "expired", stoppingToken);
+                    }
+
                     await dispatcher.DispatchAsync(ride.Id, stoppingToken);
                 }
 
